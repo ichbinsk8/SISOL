@@ -249,9 +249,18 @@ async function cargarResponsables() {
   responsablesDisponibles = await respuesta.json();
 }
 
+
 async function abrirGestion(idSolicitud) {
-    // Mostrar la asignación únicamente al administrador
+  const solicitud = solicitudes.find(
+    s => String(s.id) === String(idSolicitud)
+  );
+
+  if (!solicitud) return;
+
+  idSolicitudGestion = idSolicitud;
+
   const esAdministrador = usuarioActual?.rol === "administrador";
+  const esResponsable = usuarioActual?.rol === "responsable";
 
   const contenedorAsignacion =
     document.getElementById("contenedorAsignacion");
@@ -259,75 +268,85 @@ async function abrirGestion(idSolicitud) {
   const selectResponsable =
     document.getElementById("selectResponsable");
 
-  contenedorAsignacion.style.display =
-    esAdministrador ? "" : "none";
+  const btnGuardarGestion =
+    document.getElementById("btnGuardarGestion");
+
+  const btnResolver =
+    document.getElementById("btnResolverSolicitud");
+
+  const mensaje =
+    document.getElementById("mensajeGestion");
+
+  // Mostrar asignación solo al administrador
+  contenedorAsignacion.classList.toggle(
+    "d-none",
+    !esAdministrador
+  );
+
+  btnGuardarGestion.classList.toggle(
+    "d-none",
+    !esAdministrador
+  );
 
   selectResponsable.required = esAdministrador;
 
- const btnGuardarAsignacion =
-  document.getElementById("btnGuardarAsignacion");
+  // Mostrar resolución únicamente cuando corresponda
+  const puedeResolver =
+    solicitud.estado === "En proceso" &&
+    (
+      esAdministrador ||
+      (
+        esResponsable &&
+        String(solicitud.id_responsable) ===
+        String(usuarioActual.id)
+      )
+    );
 
-    if (btnGuardarAsignacion) {
-      btnGuardarAsignacion.style.display =
-        esAdministrador ? "" : "none";
-    }
+  btnResolver.classList.toggle("d-none", !puedeResolver);
 
-  
-
-  const solicitud = solicitudes.find(s => s.id === idSolicitud);
-
-  if (!solicitud) return;
-
-  idSolicitudGestion = idSolicitud;
+  // Información de la solicitud
   document.getElementById("estadoGestion").textContent =
-  solicitud.estado;
+    solicitud.estado;
 
   document.getElementById("nombreSolicitud").textContent =
     `Solicitud #${idSolicitud}: ${solicitud.titulo}`;
-  
+
   document.getElementById("descripcionSolicitud").textContent =
-  solicitud.descripcion || "Esta solicitud no tiene descripción.";
+    solicitud.descripcion || "Esta solicitud no tiene descripción.";
 
-  const select = document.getElementById("selectResponsable");
-  const mensaje = document.getElementById("mensajeGestion");
-
-    const btnResolver = document.getElementById("btnResolverSolicitud");
-
-    btnResolver.classList.toggle(
-      "d-none",
-      solicitud.estado !== "En proceso"
-    );
-
-    document.getElementById("observacionGestion").value = "";
-
-
-  select.replaceChildren();
+  document.getElementById("observacionGestion").value = "";
   mensaje.textContent = "";
+
+  // Limpiar lista de responsables
+  selectResponsable.replaceChildren();
 
   const opcionInicial = document.createElement("option");
   opcionInicial.value = "";
   opcionInicial.textContent = "Seleccionar responsable...";
-  select.appendChild(opcionInicial);
+  selectResponsable.appendChild(opcionInicial);
 
   try {
-    if (usuarioActual?.rol === "administrador") {
+    if (esAdministrador) {
       await cargarResponsables();
+
+      responsablesDisponibles.forEach((responsable) => {
+        const opcion = document.createElement("option");
+        opcion.value = responsable.id_usuario;
+        opcion.textContent = responsable.nombre;
+        selectResponsable.appendChild(opcion);
+      });
     }
 
-    responsablesDisponibles.forEach((responsable) => {
-      const opcion = document.createElement("option");
-      opcion.value = responsable.id_usuario;
-      opcion.textContent = responsable.nombre;
-      select.appendChild(opcion);
-    });
+    selectResponsable.value =
+      solicitud.id_responsable ?? "";
 
-    select.value = solicitud.id_responsable ?? "";
     modalGestion.show();
 
   } catch (error) {
     alert(error.message);
   }
 }
+
 
 document.getElementById("formGestion")
   .addEventListener("submit", async (event) => {
